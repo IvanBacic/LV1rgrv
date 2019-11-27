@@ -92,6 +92,9 @@ void DrawDelaunay(int numOfEdges,Subdiv2D subdiv,Mat image);
 
 void LV2MouseCallback(int event, int x, int y, int flags, void* userdata);
 
+
+bool insideOfTriangleForFirstTime(int secondEdgeIndex, int  firstPointIndex, int currentEdgeIndex, Subdiv2D subdiv);
+
 int main(int argc, char* argv[])
 {
 	int numOfPoints = 40;
@@ -200,9 +203,23 @@ void DrawDelaunay(int numOfEdges, Subdiv2D  subdiv, Mat image) {
 	imageD.release();
 }
 
+bool insideOfTriangleForFirstTime(int secondEdgeIndex,int  firstPointIndex,int currentEdgeIndex,Subdiv2D subdiv) {
+	int secondPointIndex;
 
+	do
+	{
+		secondPointIndex = subdiv.edgeOrg(secondEdgeIndex);
 
+		if (secondPointIndex < firstPointIndex || secondPointIndex < 4) // check if we alredy visited triangle
+		{
+			return false;
+		}
 
+		secondEdgeIndex = subdiv.getEdge(secondEdgeIndex, subdiv.NEXT_AROUND_LEFT);
+	} while (secondEdgeIndex != currentEdgeIndex);
+
+	return true;
+}
 
 void LV2MouseCallback(int event, int x, int y, int flags, void* userdata)
 {
@@ -213,6 +230,7 @@ void LV2MouseCallback(int event, int x, int y, int flags, void* userdata)
 		float mouseX = (float)x;
 		float mouseY = (float)y;
 
+		// all variable needed in function
 		int currentEdgeIndex, secondEdgeIndex, thirdEdgeIndex, firstPointIndex, secondPointIndex, vertexIndex, edgeIterator;
 		Point2f firstPoint, secondPoint;
 		bool bValidAndVisitedForTheFirstTime, bInsideTriangle, bValidTriangle;
@@ -220,6 +238,8 @@ void LV2MouseCallback(int event, int x, int y, int flags, void* userdata)
 		Point vertexArray[3];
 		int indexEdgeArray[3];
 		Mat image;
+		Subdiv2D *subdiv = pUserData->pSubdiv;
+
 
 		for (currentEdgeIndex = 0; currentEdgeIndex < pUserData->numOfEdges; currentEdgeIndex++)
 		{
@@ -228,21 +248,10 @@ void LV2MouseCallback(int event, int x, int y, int flags, void* userdata)
 			if (firstPointIndex < 4) // if our edge is one of the corner edges
 				continue;
 
-			bValidAndVisitedForTheFirstTime = true;
+
 			secondEdgeIndex = currentEdgeIndex;
+			bValidAndVisitedForTheFirstTime = insideOfTriangleForFirstTime(secondEdgeIndex, firstPointIndex, currentEdgeIndex, *subdiv);
 
-			do
-			{
-				secondPointIndex = pUserData->pSubdiv->edgeOrg(secondEdgeIndex);
-
-				if (secondPointIndex < firstPointIndex || secondPointIndex < 4) // check if we alredy visited triangle
-				{
-					bValidAndVisitedForTheFirstTime = false;
-					break;
-				}
-
-				secondEdgeIndex = pUserData->pSubdiv->getEdge(secondEdgeIndex, pUserData->pSubdiv->NEXT_AROUND_LEFT);
-			} while (secondEdgeIndex != currentEdgeIndex);
 
 			if (!bValidAndVisitedForTheFirstTime)
 				continue;
@@ -280,15 +289,17 @@ void LV2MouseCallback(int event, int x, int y, int flags, void* userdata)
 
 			} while (secondEdgeIndex != currentEdgeIndex); // until we get to starting triangle
 
+
+
 			if (bInsideTriangle) // if we are in valid triangle color it
 			{
 				image = pUserData->image.clone(); // so we dont overwrite orriginal image
 
 				fillConvexPoly(image, vertexArray, 3, Scalar(100, 20, 200));
 
-				for (edgeIterator = 0; edgeIterator < 3; edgeIterator++)
+				for (int i = 0; i < 3; i++)
 				{
-					thirdEdgeIndex = pUserData->pSubdiv->rotateEdge(indexEdgeArray[edgeIterator], 2); // go to neighbour 
+					thirdEdgeIndex = pUserData->pSubdiv->rotateEdge(indexEdgeArray[i], 2); // go to neighbour 
 
 					vertexIndex = 0;
 
@@ -306,7 +317,7 @@ void LV2MouseCallback(int event, int x, int y, int flags, void* userdata)
 							break;
 						}
 						vertexArray[vertexIndex++] = pUserData->pSubdiv->getVertex(firstPointIndex); // if valid add  it to triangle to color
-						secondEdgeIndex = pUserData->pSubdiv->getEdge(secondEdgeIndex, pUserData->pSubdiv->NEXT_AROUND_LEFT);
+						secondEdgeIndex = pUserData->pSubdiv->getEdge(secondEdgeIndex, pUserData->pSubdiv->NEXT_AROUND_LEFT); // go to next
 					} while (secondEdgeIndex != thirdEdgeIndex);
 					if (bValidTriangle)
 						fillConvexPoly(image, vertexArray, 3, Scalar(255, 100, 10)); // color that triangle
